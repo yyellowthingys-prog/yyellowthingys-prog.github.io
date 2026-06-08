@@ -1,12 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mr.Gilmores Stock Market</title>
+    <title>Mr. Gilmore's Stock Market</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <h1>Under Development!</h1>
-    <p>Come back soon for the full page!</p>
+    <h1>Balance: $<span id="balance">1000</span></h1>
+    <table id="market">
+        <tr><th>Stock</th><th>Price</th><th>Action</th></tr>
+        </table>
+    <canvas id="stockChart" width="400" height="200"></canvas>
+    <script src="script.js"></script>
 </body>
 </html>
