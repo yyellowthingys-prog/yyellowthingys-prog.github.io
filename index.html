@@ -1,42 +1,991 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mr. Gilmore's Stock Market</title>
-    <!-- Connecting the CSS file -->
-    <link rel="stylesheet" href="style.css">
-    <!-- Chart.js Library -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mr. Gilmore's Stock Market</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#080b0e; --surface:#0f1418; --surface2:#161c22; --surface3:#1d252e;
+  --border:#263038; --gold:#c9a84c; --gold2:#e8c97a;
+  --green:#2ecc71; --red:#e74c3c; --text:#ddd8d0; --text2:#8a9aaa;
+  --text3:#4a5a6a; --live:#3bdf8a;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:repeating-linear-gradient(0deg,transparent,transparent 40px,rgba(201,168,76,.012) 40px,rgba(201,168,76,.012) 41px),repeating-linear-gradient(90deg,transparent,transparent 40px,rgba(201,168,76,.012) 40px,rgba(201,168,76,.012) 41px);pointer-events:none;z-index:0;}
+
+/* SETUP BANNER */
+#setup-banner{display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.9);align-items:center;justify-content:center;padding:2rem;}
+.setup-box{max-width:580px;background:var(--surface);border:1px solid var(--gold);border-radius:14px;padding:2rem;}
+.setup-box h2{font-family:'Playfair Display',serif;color:var(--gold);font-size:1.4rem;margin-bottom:.75rem;}
+.setup-box p{color:var(--text2);font-size:.85rem;margin-bottom:.5rem;line-height:1.7;}
+.setup-box ol{color:var(--text2);font-size:.85rem;line-height:2;padding-left:1.2rem;margin-bottom:.75rem;}
+.setup-box code{display:block;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:.75rem 1rem;font-family:'IBM Plex Mono',monospace;font-size:.76rem;color:var(--gold2);white-space:pre;overflow-x:auto;margin:.75rem 0;}
+.setup-dismiss{background:var(--gold);color:#000;border:none;border-radius:7px;padding:.5rem 1.5rem;font-family:'IBM Plex Mono',monospace;font-size:.85rem;cursor:pointer;margin-top:.5rem;}
+
+/* HEADER */
+header{position:sticky;top:0;z-index:100;background:rgba(8,11,14,.97);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:60px;gap:1rem;}
+.header-logo{font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:900;color:var(--gold);white-space:nowrap;display:flex;align-items:center;gap:.5rem;}
+.header-logo span{color:var(--text3);font-size:.7rem;font-family:'IBM Plex Mono',monospace;font-weight:400;}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--live);box-shadow:0 0 6px var(--live);animation:pulse 1.8s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.header-right{display:flex;align-items:center;gap:.75rem;flex-shrink:0;}
+.hval{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:.3rem .85rem;font-family:'IBM Plex Mono',monospace;font-size:.95rem;color:var(--gold2);font-weight:600;}
+.hval label{font-size:.58rem;color:var(--text3);display:block;font-family:'IBM Plex Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;}
+#tick-badge{font-family:'IBM Plex Mono',monospace;font-size:.7rem;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:.15rem .45rem;}
+.hdr-btn{background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:.3rem .7rem;font-family:'IBM Plex Mono',monospace;font-size:.72rem;cursor:pointer;transition:.15s;white-space:nowrap;}
+.hdr-btn:hover{border-color:var(--gold);color:var(--gold);}
+.hdr-btn.danger:hover{border-color:var(--red);color:var(--red);}
+.lb-btn{border-color:rgba(201,168,76,.4);color:var(--gold2);}
+.lb-btn:hover{background:rgba(201,168,76,.08);border-color:var(--gold);}
+
+/* APP */
+.app{position:relative;z-index:1;max-width:1380px;margin:0 auto;padding:1.5rem 2rem;}
+
+/* TICKER */
+.ticker-wrap{overflow:hidden;background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-bottom:1.75rem;padding:.45rem 0;}
+.ticker-inner{display:flex;gap:3rem;animation:ticker-scroll 35s linear infinite;width:max-content;}
+@keyframes ticker-scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.ticker-item{font-family:'IBM Plex Mono',monospace;font-size:.78rem;white-space:nowrap;display:flex;gap:.45rem;}
+.ticker-sym{color:var(--gold);font-weight:600;}
+.ticker-change.up{color:var(--green);}
+.ticker-change.dn{color:var(--red);}
+
+/* STATS BAR */
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.75rem;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.9rem 1.1rem;}
+.stat-card-label{font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem;}
+.stat-card-val{font-family:'IBM Plex Mono',monospace;font-size:1rem;font-weight:600;color:var(--text);}
+.stat-card-val.up{color:var(--green);}
+.stat-card-val.dn{color:var(--red);}
+
+/* PORTFOLIO */
+.portfolio-strip{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.4rem;margin-bottom:1.75rem;}
+.portfolio-strip h2{font-family:'Playfair Display',serif;font-size:1rem;color:var(--gold2);margin-bottom:.9rem;}
+.portfolio-items{display:flex;gap:.75rem;flex-wrap:wrap;}
+.port-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.45rem .85rem;font-family:'IBM Plex Mono',monospace;font-size:.75rem;display:flex;flex-direction:column;gap:.1rem;cursor:pointer;transition:border-color .15s;}
+.port-item:hover{border-color:var(--gold);}
+.port-sym{color:var(--gold);font-weight:600;}
+.port-shares{color:var(--text2);}
+.port-pnl{font-weight:600;}
+.port-pnl.up{color:var(--green);}
+.port-pnl.dn{color:var(--red);}
+
+/* SECTION */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;}
+.section-title{font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--gold);}
+.section-sub{font-size:.75rem;color:var(--text3);font-family:'IBM Plex Mono',monospace;}
+
+/* GRID */
+.stocks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:1.1rem;}
+.stock-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.1rem;cursor:pointer;transition:border-color .2s,transform .15s,box-shadow .2s;position:relative;overflow:hidden;}
+.stock-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--gold),transparent);opacity:0;transition:opacity .2s;}
+.stock-card:hover{border-color:var(--gold);transform:translateY(-2px);box-shadow:0 8px 28px rgba(201,168,76,.07);}
+.stock-card:hover::before{opacity:1;}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.65rem;}
+.stock-sym{font-family:'IBM Plex Mono',monospace;font-size:1.15rem;font-weight:600;color:var(--gold);}
+.stock-name{font-size:.75rem;color:var(--text2);margin-top:.1rem;}
+.stock-sector{font-size:.6rem;color:var(--text3);background:var(--surface3);border-radius:4px;padding:.12rem .45rem;font-family:'IBM Plex Mono',monospace;letter-spacing:.05em;}
+.card-price-row{display:flex;align-items:baseline;gap:.65rem;margin-bottom:.45rem;}
+.card-price{font-family:'IBM Plex Mono',monospace;font-size:1.4rem;font-weight:600;}
+.card-change{font-family:'IBM Plex Mono',monospace;font-size:.82rem;font-weight:600;}
+.card-change.up{color:var(--green);}
+.card-change.dn{color:var(--red);}
+.sparkline{width:100%;height:38px;margin-bottom:.65rem;}
+.card-footer{display:flex;gap:.45rem;align-items:center;}
+.owned-badge{font-family:'IBM Plex Mono',monospace;font-size:.68rem;background:rgba(201,168,76,.1);color:var(--gold);border:1px solid rgba(201,168,76,.28);border-radius:4px;padding:.18rem .45rem;}
+.vol-info{font-size:.68rem;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-left:auto;}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(6px);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem;opacity:0;pointer-events:none;transition:opacity .2s;}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;padding:1.75rem;position:relative;transform:translateY(18px);transition:transform .2s;}
+.modal-overlay.open .modal{transform:translateY(0);}
+.modal-close{position:absolute;top:.9rem;right:.9rem;background:var(--surface3);border:1px solid var(--border);color:var(--text2);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;}
+.modal-sym{font-family:'Playfair Display',serif;font-size:1.9rem;color:var(--gold);font-weight:900;}
+.modal-company{font-size:.85rem;color:var(--text2);margin-bottom:.2rem;}
+.modal-sector-tag{font-size:.65rem;color:var(--text3);font-family:'IBM Plex Mono',monospace;}
+.modal-price-row{display:flex;align-items:baseline;gap:.9rem;margin:.9rem 0;}
+.modal-price{font-family:'IBM Plex Mono',monospace;font-size:2rem;font-weight:600;}
+.modal-change{font-family:'IBM Plex Mono',monospace;font-size:.95rem;font-weight:600;}
+.modal-change.up{color:var(--green);}
+.modal-change.dn{color:var(--red);}
+.full-chart{width:100%;height:170px;margin-bottom:1.25rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);}
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.65rem;margin-bottom:1.25rem;}
+.stat-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.55rem .75rem;}
+.stat-label{font-size:.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.15rem;}
+.stat-val{font-family:'IBM Plex Mono',monospace;font-size:.87rem;color:var(--text);font-weight:600;}
+.stat-val.up{color:var(--green);}
+.stat-val.dn{color:var(--red);}
+.trade-section{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1.1rem;}
+.trade-tabs{display:flex;gap:.45rem;margin-bottom:.9rem;}
+.trade-tab{flex:1;padding:.45rem;border-radius:6px;border:1px solid var(--border);background:var(--surface3);color:var(--text2);font-family:'IBM Plex Mono',monospace;font-size:.82rem;cursor:pointer;transition:all .15s;text-align:center;}
+.trade-tab.active-buy{background:rgba(46,204,113,.11);border-color:var(--green);color:var(--green);}
+.trade-tab.active-sell{background:rgba(231,76,60,.11);border-color:var(--red);color:var(--red);}
+.trade-input-row{display:flex;gap:.65rem;align-items:center;margin-bottom:.65rem;}
+.trade-input{flex:1;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:.55rem .7rem;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:.95rem;outline:none;}
+.trade-input:focus{border-color:var(--gold);}
+.trade-cost{font-family:'IBM Plex Mono',monospace;font-size:.82rem;color:var(--text2);margin-bottom:.65rem;}
+.trade-cost strong{color:var(--gold2);}
+.trade-btn{width:100%;padding:.7rem;border-radius:8px;border:none;font-family:'IBM Plex Mono',monospace;font-size:.95rem;font-weight:600;cursor:pointer;transition:all .15s;}
+.trade-btn.buy-btn{background:var(--green);color:#000;}
+.trade-btn.buy-btn:hover{background:#27ae60;}
+.trade-btn.sell-btn{background:var(--red);color:#fff;}
+.trade-btn.sell-btn:hover{background:#c0392b;}
+.trade-btn:disabled{opacity:.5;cursor:not-allowed;}
+.trade-msg{margin-top:.45rem;font-size:.78rem;font-family:'IBM Plex Mono',monospace;min-height:1rem;text-align:center;}
+.trade-msg.ok{color:var(--green);}
+.trade-msg.err{color:var(--red);}
+
+/* LEADERBOARD MODAL */
+#lb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(8px);z-index:210;display:flex;align-items:center;justify-content:center;padding:1rem;opacity:0;pointer-events:none;transition:opacity .2s;}
+#lb-overlay.open{opacity:1;pointer-events:all;}
+#lb-modal{background:var(--surface);border:1px solid var(--border);border-radius:18px;width:100%;max-width:700px;max-height:88vh;overflow-y:auto;padding:2rem;position:relative;transform:translateY(18px);transition:transform .2s;}
+#lb-overlay.open #lb-modal{transform:translateY(0);}
+.lb-title{font-family:'Playfair Display',serif;font-size:2rem;font-weight:900;color:var(--gold);margin-bottom:.25rem;}
+.lb-sub{font-size:.75rem;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-bottom:1.5rem;}
+.lb-tabs{display:flex;gap:.5rem;margin-bottom:1.5rem;}
+.lb-tab{flex:1;padding:.55rem;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-family:'IBM Plex Mono',monospace;font-size:.85rem;cursor:pointer;transition:all .15s;text-align:center;font-weight:600;}
+.lb-tab.active{background:rgba(201,168,76,.12);border-color:var(--gold);color:var(--gold2);}
+.lb-table{width:100%;border-collapse:collapse;}
+.lb-table th{font-family:'IBM Plex Mono',monospace;font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;padding:.5rem .75rem;text-align:left;border-bottom:1px solid var(--border);}
+.lb-table td{padding:.7rem .75rem;border-bottom:1px solid rgba(38,48,56,.5);font-family:'IBM Plex Mono',monospace;font-size:.85rem;}
+.lb-table tr:last-child td{border-bottom:none;}
+.lb-table tr.me td{background:rgba(201,168,76,.06);}
+.lb-rank{color:var(--text3);font-size:.8rem;}
+.lb-rank.gold{color:#ffd700;font-size:1rem;}
+.lb-rank.silver{color:#c0c0c0;font-size:1rem;}
+.lb-rank.bronze{color:#cd7f32;font-size:1rem;}
+.lb-name{color:var(--text);font-weight:600;}
+.lb-name .you{color:var(--gold);font-size:.65rem;margin-left:.4rem;border:1px solid rgba(201,168,76,.4);border-radius:3px;padding:.05rem .3rem;}
+.lb-cash{color:var(--green);}
+.lb-netw{color:var(--gold2);}
+.lb-loading{text-align:center;padding:2rem;color:var(--text3);font-family:'IBM Plex Mono',monospace;font-size:.85rem;}
+.lb-empty{text-align:center;padding:2rem;color:var(--text3);font-family:'IBM Plex Mono',monospace;font-size:.85rem;}
+.lb-refresh{background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:.3rem .75rem;font-family:'IBM Plex Mono',monospace;font-size:.72rem;cursor:pointer;margin-top:1rem;transition:.15s;}
+.lb-refresh:hover{border-color:var(--gold);color:var(--gold);}
+
+/* ONBOARDING */
+#onboarding{position:fixed;inset:0;background:var(--bg);z-index:300;display:flex;align-items:center;justify-content:center;padding:2rem;}
+.onboarding-box{max-width:440px;text-align:center;}
+.onboarding-title{font-family:'Playfair Display',serif;font-size:2.8rem;font-weight:900;color:var(--gold);line-height:1.1;margin-bottom:.4rem;}
+.onboarding-sub{color:var(--text2);font-size:.85rem;margin-bottom:.25rem;}
+.onboarding-desc{color:var(--text3);font-size:.78rem;font-family:'IBM Plex Mono',monospace;margin-bottom:1.75rem;line-height:1.65;}
+.name-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.7rem 1rem;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:1rem;outline:none;text-align:center;margin-bottom:.5rem;}
+.name-input:focus{border-color:var(--gold);}
+.name-err{color:var(--red);font-family:'IBM Plex Mono',monospace;font-size:.75rem;min-height:1.2rem;margin-bottom:.75rem;}
+.start-btn{background:var(--gold);color:#000;border:none;border-radius:10px;padding:.85rem 2.25rem;font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.03em;}
+.start-btn:hover{background:var(--gold2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(201,168,76,.22);}
+.start-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+.start-bal{font-family:'IBM Plex Mono',monospace;font-size:1.8rem;color:var(--gold2);font-weight:600;margin:.9rem 0 .2rem;}
+.start-bal-label{font-size:.7rem;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1.4rem;}
+
+/* TOAST */
+#toast{position:fixed;bottom:1.75rem;right:1.75rem;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:.65rem 1.1rem;font-family:'IBM Plex Mono',monospace;font-size:.82rem;z-index:500;transform:translateY(16px);opacity:0;transition:all .25s;pointer-events:none;max-width:280px;}
+#toast.show{opacity:1;transform:translateY(0);}
+#toast.ok{border-color:var(--green);color:var(--green);}
+#toast.err{border-color:var(--red);color:var(--red);}
+
+@media(max-width:700px){
+  .stats-bar{grid-template-columns:repeat(2,1fr);}
+  header{padding:0 .75rem;}
+  .header-logo span{display:none;}
+  .app{padding:1rem;}
+  .hval{font-size:.82rem;padding:.25rem .6rem;}
+  #tick-badge{display:none;}
+}
+</style>
 </head>
 <body>
 
-    <header>
-        <h1>Mr. Gilmore's Stock Market</h1>
-        <h2>Balance: $<span id="balance">1000.00</span></h2>
-    </header>
+<!-- SETUP BANNER -->
+<div id="setup-banner">
+  <div class="setup-box">
+    <h2>&#x2699;&#xFE0F; Firebase Setup Required for Multiplayer</h2>
+    <p>To sync the market live across the whole class, you need a <strong>free Firebase Realtime Database</strong>.</p>
+    <ol>
+      <li>Go to <strong>console.firebase.google.com</strong> &#x2192; New project</li>
+      <li>Click <strong>Realtime Database</strong> &#x2192; Create &#x2192; <em>Start in test mode</em></li>
+      <li>Go to <strong>Project Settings &#x2192; Your Apps &#x2192; Web (&lt;/&gt;)</strong></li>
+      <li>Copy your config and replace the placeholder values near the top of <code>index.html</code></li>
+    </ol>
+    <code>const FIREBASE_CONFIG = {
+  apiKey:            "AIza...",
+  authDomain:        "your-project.firebaseapp.com",
+  databaseURL:       "https://your-project-default-rtdb.firebaseio.com",
+  projectId:         "your-project",
+  storageBucket:     "your-project.appspot.com",
+  messagingSenderId: "123456789",
+  appId:             "1:123...:web:abc..."
+};</code>
+    <p style="color:var(--text3);font-size:.75rem">Until configured, the game runs in single-player offline mode (leaderboard requires Firebase).</p>
+    <button class="setup-dismiss" onclick="document.getElementById('setup-banner').style.display='none'">Got it &#x2014; play offline for now</button>
+  </div>
+</div>
 
-    <main>
-        <table id="market">
-            <thead>
-                <tr>
-                    <th>Stock Name</th>
-                    <th>Current Price</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="stock-body">
-                <!-- Data will be injected here by script.js -->
-            </tbody>
-        </table>
+<!-- ONBOARDING -->
+<div id="onboarding">
+  <div class="onboarding-box">
+    <div class="onboarding-title">Mr. Gilmore's<br>Stock Market</div>
+    <div class="onboarding-sub">The classroom market that actually moves</div>
+    <div class="onboarding-desc">
+      Prices update live for the whole class.<br>
+      Your buys push prices up. Your sells push them down.<br>
+      Outsmart your classmates. Build your fortune.
+    </div>
+    <div class="start-bal">$5,000</div>
+    <div class="start-bal-label">Your Starting Capital</div>
+    <input class="name-input" id="name-input" type="text" maxlength="20" placeholder="Enter your name...">
+    <div class="name-err" id="name-err"></div>
+    <button class="start-btn" id="start-btn">Ring the Bell &#x1F514;</button>
+  </div>
+</div>
 
-        <div class="chart-container">
-            <h3>Price History</h3>
-            <canvas id="stockChart"></canvas>
-        </div>
-    </main>
+<!-- HEADER -->
+<header>
+  <div class="header-logo">
+    <div class="live-dot"></div>
+    Mr. Gilmore's <span>STOCK MARKET</span>
+  </div>
+  <div class="header-right">
+    <span id="tick-badge">TICK #<span id="tick-num">0</span></span>
+    <div class="hval"><label>Cash</label><span id="header-cash">$5,000.00</span></div>
+    <div class="hval" style="color:var(--text)"><label>Portfolio</label><span id="header-port">$0.00</span></div>
+    <button class="hdr-btn lb-btn" onclick="openLeaderboard()">&#x1F3C6; Leaderboard</button>
+    <button class="hdr-btn danger" onclick="resetAccount()">&#x21BA; Reset</button>
+  </div>
+</header>
 
-    <!-- Connecting the JS file -->
-    <script src="script.js"></script>
+<div class="app">
+  <div class="ticker-wrap"><div class="ticker-inner" id="ticker-inner"></div></div>
+
+  <div class="stats-bar">
+    <div class="stat-card"><div class="stat-card-label">Net Worth</div><div class="stat-card-val" id="stat-networth">$5,000.00</div></div>
+    <div class="stat-card"><div class="stat-card-label">Total P&amp;L</div><div class="stat-card-val" id="stat-pnl">$0.00</div></div>
+    <div class="stat-card"><div class="stat-card-label">Best Performer</div><div class="stat-card-val up" id="stat-best">&#x2014;</div></div>
+    <div class="stat-card"><div class="stat-card-label">Worst Performer</div><div class="stat-card-val dn" id="stat-worst">&#x2014;</div></div>
+  </div>
+
+  <div class="portfolio-strip" id="portfolio-strip" style="display:none">
+    <h2>&#x1F4C2; Your Portfolio</h2>
+    <div class="portfolio-items" id="portfolio-items"></div>
+  </div>
+
+  <div class="section-header">
+    <div>
+      <div class="section-title">Market Listings</div>
+      <div class="section-sub" id="sync-status">&#x25CF; Connecting...</div>
+    </div>
+  </div>
+  <div class="stocks-grid" id="stocks-grid"></div>
+</div>
+
+<!-- STOCK MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <button class="modal-close" id="modal-close-btn">&#x2715;</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<!-- LEADERBOARD MODAL -->
+<div id="lb-overlay">
+  <div id="lb-modal">
+    <button class="modal-close" onclick="closeLeaderboard()" style="position:absolute;top:.9rem;right:.9rem">&#x2715;</button>
+    <div class="lb-title">&#x1F3C6; Leaderboard</div>
+    <div class="lb-sub" id="lb-sub">Updated live &mdash; who reigns supreme?</div>
+    <div class="lb-tabs">
+      <div class="lb-tab active" id="lb-tab-netw" onclick="switchLbTab('netw')">&#x1F4B0; Net Worth</div>
+      <div class="lb-tab" id="lb-tab-cash" onclick="switchLbTab('cash')">&#x1F4B5; Most Cash</div>
+    </div>
+    <div id="lb-body"><div class="lb-loading">Loading...</div></div>
+    <div style="text-align:center"><button class="lb-refresh" onclick="renderLeaderboard()">&#x21BB; Refresh</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+// =========================================================
+//  FIREBASE CONFIG — replace with your own values
+// =========================================================
+const FIREBASE_CONFIG = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
+};
+// =========================================================
+
+import { initializeApp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, runTransaction }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+// ── CONSTANTS ──────────────────────────────────────────────
+const STOCK_DEFS = [
+  { sym:'GLMR', name:'Gilmore Industries',   sector:'CONGLOMERATE', base:142.50 },
+  { sym:'NVXA', name:'Nova Xantech Corp',     sector:'TECH',         base:312.80 },
+  { sym:'CRBN', name:'Carbonyte Energy',      sector:'ENERGY',       base:45.20  },
+  { sym:'LUXE', name:'Luxera Holdings',       sector:'LUXURY',       base:88.40  },
+  { sym:'BRIX', name:'Brixstone Realty',      sector:'REAL ESTATE',  base:67.10  },
+  { sym:'MEDS', name:'Medsynth Pharma',       sector:'HEALTH',       base:201.30 },
+  { sym:'FERR', name:'Ferro Dynamics',        sector:'MATERIALS',    base:29.75  },
+  { sym:'AERO', name:'Aerospan Transit',      sector:'AEROSPACE',    base:156.60 },
+  { sym:'DIGI', name:'DigiFlow Systems',      sector:'TECH',         base:78.90  },
+  { sym:'GOLD', name:'Goldvein Mining',       sector:'MINING',       base:34.55  },
+  { sym:'WAVE', name:'Waveform Media',        sector:'MEDIA',        base:19.80  },
+  { sym:'BANK', name:'First Gilmore Bank',    sector:'FINANCE',      base:95.00  },
+];
+const START_BAL   = 5000;
+const TICK_MS     = 6000;
+const PLAYER_KEY  = 'mrgilmore_player_v3';
+const STALE_MS    = TICK_MS * 2.5;
+
+// ── STATE ──────────────────────────────────────────────────
+let player       = loadPlayer();
+let marketState  = null;
+let selectedSym  = null;
+let tradeMode    = 'buy';
+let db           = null;
+let isLeader     = false;
+let tickTimer    = null;
+let offlineMode  = false;
+let lbTab        = 'netw';
+
+// ── FIREBASE INIT ──────────────────────────────────────────
+async function initFirebase() {
+  if (FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') {
+    document.getElementById('setup-banner').style.display = 'flex';
+    startOffline();
+    return;
+  }
+  try {
+    const app = initializeApp(FIREBASE_CONFIG);
+    db = getDatabase(app);
+    await setupMarket();
+  } catch(e) {
+    console.warn('Firebase failed:', e);
+    document.getElementById('setup-banner').style.display = 'flex';
+    startOffline();
+  }
+}
+
+async function setupMarket() {
+  const mRef = ref(db, 'market');
+  const snap = await get(mRef);
+  if (!snap.exists()) {
+    const stocks = {};
+    STOCK_DEFS.forEach(d => {
+      stocks[d.sym] = { price: d.base, history: [d.base], buyPressure: 0, sellPressure: 0 };
+    });
+    await set(mRef, { stocks, tick: 0 });
+  }
+  onValue(mRef, snap => {
+    if (!snap.exists()) return;
+    marketState = snap.val();
+    renderAll();
+    updateTicker();
+    if (selectedSym) renderModalContent(selectedSym);
+    setSyncStatus(true);
+    // Push updated portfolio value to leaderboard registry
+    if (player.started) pushPlayerScore();
+  });
+  electLeader();
+}
+
+// ── PUSH SCORE TO FIREBASE ────────────────────────────────
+async function pushPlayerScore() {
+  if (!db || offlineMode || !player.name) return;
+  const portVal = portfolioValue();
+  const netWorth = player.cash + portVal;
+  try {
+    await set(ref(db, 'players/' + player.id), {
+      name:     player.name,
+      cash:     Math.round(player.cash * 100) / 100,
+      netWorth: Math.round(netWorth * 100) / 100,
+      ts:       Date.now()
+    });
+  } catch(e) {}
+}
+
+// ── NAME UNIQUENESS CHECK ─────────────────────────────────
+async function isNameTaken(name) {
+  if (!db || offlineMode) return false;
+  try {
+    const snap = await get(ref(db, 'players'));
+    if (!snap.exists()) return false;
+    const all = snap.val();
+    return Object.entries(all).some(([id, p]) =>
+      id !== player.id && p.name && p.name.toLowerCase() === name.toLowerCase()
+    );
+  } catch(e) { return false; }
+}
+
+// ── LEADER ELECTION ────────────────────────────────────────
+async function electLeader() {
+  const lRef = ref(db, 'leader');
+  const myId = player.id;
+  async function tryLead() {
+    try {
+      const snap = await get(lRef);
+      const now  = Date.now();
+      const data = snap.val();
+      if (!data || (now - (data.ts || 0)) > STALE_MS) {
+        await set(lRef, { id: myId, ts: now });
+        const confirm = await get(lRef);
+        if (confirm.val()?.id === myId) {
+          if (!isLeader) { isLeader = true; startTicking(); }
+        }
+      } else if (data.id === myId) {
+        if (!isLeader) { isLeader = true; startTicking(); }
+      } else {
+        isLeader = false;
+        clearInterval(tickTimer); tickTimer = null;
+      }
+    } catch(e) {}
+  }
+  tryLead();
+  setInterval(tryLead, TICK_MS * 1.2);
+}
+
+function startTicking() {
+  clearInterval(tickTimer);
+  tickTimer = setInterval(tickMarket, TICK_MS);
+}
+
+async function tickMarket() {
+  if (!db || !isLeader) return;
+  try {
+    await runTransaction(ref(db, 'market'), cur => {
+      if (!cur) return cur;
+      STOCK_DEFS.forEach(def => {
+        const s = cur.stocks[def.sym];
+        if (!s) return;
+        const p      = s.price;
+        const demand = ((s.buyPressure || 0) - (s.sellPressure || 0)) * 0.009;
+        const drift  = (Math.random() - 0.488) * 0.022;
+        const vol    = (50 / p) * 0.014 + 0.005;
+        const noise  = (Math.random() - 0.5) * vol * p;
+        const revert = (def.base - p) * 0.004;
+        let np = p + noise + revert + p * drift + p * demand;
+        np = Math.max(0.50, Math.round(np * 100) / 100);
+        const hist = s.history || [p];
+        hist.push(np);
+        if (hist.length > 80) hist.shift();
+        s.price        = np;
+        s.history      = hist;
+        s.buyPressure  = (s.buyPressure  || 0) * 0.65;
+        s.sellPressure = (s.sellPressure || 0) * 0.65;
+      });
+      cur.tick = (cur.tick || 0) + 1;
+      return cur;
+    });
+    await set(ref(db, 'leader'), { id: player.id, ts: Date.now() });
+  } catch(e) { isLeader = false; }
+}
+
+// ── OFFLINE FALLBACK ───────────────────────────────────────
+function startOffline() {
+  offlineMode = true;
+  setSyncStatus(false);
+  const stocks = {};
+  STOCK_DEFS.forEach(d => {
+    stocks[d.sym] = { price: d.base, history: [d.base], buyPressure: 0, sellPressure: 0 };
+  });
+  marketState = { stocks, tick: 0 };
+  setInterval(() => {
+    STOCK_DEFS.forEach(def => {
+      const s  = marketState.stocks[def.sym];
+      const p  = s.price;
+      const d  = ((s.buyPressure || 0) - (s.sellPressure || 0)) * 0.009;
+      const dr = (Math.random() - 0.488) * 0.022;
+      const v  = (50 / p) * 0.014 + 0.005;
+      const n  = (Math.random() - 0.5) * v * p;
+      const rv = (def.base - p) * 0.004;
+      let np   = p + n + rv + p * dr + p * d;
+      np = Math.max(0.50, Math.round(np * 100) / 100);
+      s.history.push(np);
+      if (s.history.length > 80) s.history.shift();
+      s.price        = np;
+      s.buyPressure  = (s.buyPressure  || 0) * 0.65;
+      s.sellPressure = (s.sellPressure || 0) * 0.65;
+    });
+    marketState.tick++;
+    renderAll(); updateTicker();
+    if (selectedSym) renderModalContent(selectedSym);
+  }, TICK_MS);
+  renderAll(); updateTicker();
+}
+
+// ── TRADE ──────────────────────────────────────────────────
+async function executeBuy(sym, shares) {
+  if (!marketState) return { ok:false, msg:'Market not ready' };
+  const price = marketState.stocks[sym].price;
+  const cost  = price * shares;
+  if (shares < 1)         return { ok:false, msg:'Enter at least 1 share' };
+  if (cost > player.cash) return { ok:false, msg:'Not enough cash!' };
+
+  if (db && !offlineMode) {
+    await runTransaction(ref(db, 'market/stocks/'+sym), s => {
+      if (!s) return s;
+      s.buyPressure = (s.buyPressure||0) + shares * 0.6;
+      return s;
+    });
+  } else {
+    marketState.stocks[sym].buyPressure = (marketState.stocks[sym].buyPressure||0) + shares*0.6;
+  }
+
+  player.cash -= cost;
+  if (!player.portfolio[sym]) player.portfolio[sym] = { shares:0, avgCost:0 };
+  const port     = player.portfolio[sym];
+  const oldTotal = port.shares * port.avgCost;
+  port.shares   += shares;
+  port.avgCost   = (oldTotal + cost) / port.shares;
+  savePlayer();
+  pushPlayerScore();
+  return { ok:true, msg:'Bought '+shares+' share'+(shares>1?'s':'')+' of '+sym };
+}
+
+async function executeSell(sym, shares) {
+  if (!marketState) return { ok:false, msg:'Market not ready' };
+  const port = player.portfolio[sym];
+  if (!port || port.shares < shares) return { ok:false, msg:'Not enough shares!' };
+  if (shares < 1)                    return { ok:false, msg:'Enter at least 1 share' };
+
+  const price    = marketState.stocks[sym].price;
+  const proceeds = price * shares;
+
+  if (db && !offlineMode) {
+    await runTransaction(ref(db, 'market/stocks/'+sym), s => {
+      if (!s) return s;
+      s.sellPressure = (s.sellPressure||0) + shares * 0.6;
+      return s;
+    });
+  } else {
+    marketState.stocks[sym].sellPressure = (marketState.stocks[sym].sellPressure||0) + shares*0.6;
+  }
+
+  player.cash  += proceeds;
+  port.shares  -= shares;
+  if (port.shares <= 0) delete player.portfolio[sym];
+  savePlayer();
+  pushPlayerScore();
+  return { ok:true, msg:'Sold '+shares+' share'+(shares>1?'s':'')+' of '+sym };
+}
+
+// ── PLAYER PERSISTENCE ─────────────────────────────────────
+function loadPlayer() {
+  try { const r = localStorage.getItem(PLAYER_KEY); if (r) return JSON.parse(r); } catch(e) {}
+  return freshPlayer();
+}
+function freshPlayer() {
+  return { id:Math.random().toString(36).slice(2,10), name:'', cash:START_BAL, startBal:START_BAL, portfolio:{}, started:false };
+}
+function savePlayer() { localStorage.setItem(PLAYER_KEY, JSON.stringify(player)); }
+
+// ── HELPERS ────────────────────────────────────────────────
+const fmt = n => '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+function pctChange(hist) {
+  if (!hist || hist.length < 2) return 0;
+  const old = hist[Math.max(0, hist.length-20)];
+  return ((hist[hist.length-1] - old) / old) * 100;
+}
+
+function portfolioValue() {
+  if (!marketState) return 0;
+  return Object.entries(player.portfolio).reduce((s,[sym,p]) => {
+    const st = marketState.stocks[sym];
+    return s + (st ? st.price * p.shares : 0);
+  }, 0);
+}
+
+function sparklineSVG(hist, color) {
+  const pts = (hist||[]).slice(-40);
+  if (pts.length < 2) return '';
+  const w=280,h=38,mn=Math.min(...pts),mx=Math.max(...pts),rng=mx-mn||1;
+  const c = pts.map((v,i) => ((i/(pts.length-1))*w)+','+(h-((v-mn)/rng)*(h*.85)-h*.05));
+  const line=c.join(' ');
+  const area=c[0].split(',')[0]+','+h+' '+line+' '+c[c.length-1].split(',')[0]+','+h;
+  const gid='g'+color.replace('#','');
+  return '<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="width:100%;height:100%">'
+    +'<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1">'
+    +'<stop offset="0%" stop-color="'+color+'" stop-opacity="0.25"/>'
+    +'<stop offset="100%" stop-color="'+color+'" stop-opacity="0"/>'
+    +'</linearGradient></defs>'
+    +'<polygon points="'+area+'" fill="url(#'+gid+')"/>'
+    +'<polyline points="'+line+'" fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linejoin="round"/>'
+    +'</svg>';
+}
+
+function fullChartSVG(hist) {
+  const pts = hist||[];
+  if (pts.length < 2) return '';
+  const w=560,h=160,pad=12;
+  const mn=Math.min(...pts),mx=Math.max(...pts),rng=mx-mn||1;
+  const isUp = pts[pts.length-1]>=pts[0];
+  const color = isUp ? '#2ecc71' : '#e74c3c';
+  const c = pts.map((v,i) => {
+    const x=pad+(i/(pts.length-1))*(w-pad*2);
+    const y=pad+(h-pad*2)-((v-mn)/rng)*(h-pad*2);
+    return x+','+y;
+  });
+  const line=c.join(' ');
+  const area=pad+','+(h-pad)+' '+line+' '+(w-pad)+','+(h-pad);
+  return '<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">'
+    +'<defs><linearGradient id="fcg" x1="0" y1="0" x2="0" y2="1">'
+    +'<stop offset="0%" stop-color="'+color+'" stop-opacity="0.2"/>'
+    +'<stop offset="100%" stop-color="'+color+'" stop-opacity="0"/>'
+    +'</linearGradient></defs>'
+    +'<text x="'+(pad+2)+'" y="20" fill="#4a5a6a" font-size="9" font-family="IBM Plex Mono">'+fmt(mx)+'</text>'
+    +'<text x="'+(pad+2)+'" y="'+(h-2)+'" fill="#4a5a6a" font-size="9" font-family="IBM Plex Mono">'+fmt(mn)+'</text>'
+    +'<polygon points="'+area+'" fill="url(#fcg)"/>'
+    +'<polyline points="'+line+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linejoin="round"/>'
+    +'<circle cx="'+c[c.length-1].split(',')[0]+'" cy="'+c[c.length-1].split(',')[1]+'" r="3" fill="'+color+'"/>'
+    +'</svg>';
+}
+
+// ── RENDER ─────────────────────────────────────────────────
+function renderAll() {
+  if (!marketState) return;
+  const port = portfolioValue();
+  const netW = player.cash + port;
+  const pnl  = netW - player.startBal;
+  document.getElementById('header-cash').textContent = fmt(player.cash);
+  document.getElementById('header-port').textContent = fmt(port);
+  document.getElementById('tick-num').textContent    = marketState.tick || 0;
+  const nwEl = document.getElementById('stat-networth');
+  nwEl.textContent = fmt(netW);
+  nwEl.className   = 'stat-card-val '+(pnl>=0?'up':'dn');
+  const pnlEl = document.getElementById('stat-pnl');
+  pnlEl.textContent = (pnl>=0?'+':'')+fmt(pnl);
+  pnlEl.className   = 'stat-card-val '+(pnl>=0?'up':'dn');
+  let best=null,worst=null,bPct=-Infinity,wPct=Infinity;
+  STOCK_DEFS.forEach(d => {
+    const pct=pctChange(marketState.stocks[d.sym]?.history);
+    if(pct>bPct){bPct=pct;best=d.sym;}
+    if(pct<wPct){wPct=pct;worst=d.sym;}
+  });
+  document.getElementById('stat-best').textContent  = best  ? best +'  '+(bPct>0?'+':'')+bPct.toFixed(2)+'%'  : '\u2014';
+  document.getElementById('stat-worst').textContent = worst ? worst+' '+wPct.toFixed(2)+'%' : '\u2014';
+  renderPortfolio();
+  renderGrid();
+}
+
+function renderPortfolio() {
+  const syms  = Object.keys(player.portfolio);
+  const strip = document.getElementById('portfolio-strip');
+  if (!syms.length || !marketState) { strip.style.display='none'; return; }
+  strip.style.display = 'block';
+  document.getElementById('portfolio-items').innerHTML = syms.map(sym => {
+    const p   = player.portfolio[sym];
+    const cur = marketState.stocks[sym]?.price || p.avgCost;
+    const g   = (cur - p.avgCost) * p.shares;
+    const pct = ((cur - p.avgCost) / p.avgCost) * 100;
+    return '<div class="port-item" onclick="openModal(\''+sym+'\')">'
+      +'<span class="port-sym">'+sym+'</span>'
+      +'<span class="port-shares">'+p.shares+' @ '+fmt(p.avgCost)+'</span>'
+      +'<span class="port-pnl '+(g>=0?'up':'dn')+'">'+(g>=0?'+':'')+fmt(g)+' ('+pct.toFixed(2)+'%)</span>'
+      +'</div>';
+  }).join('');
+}
+
+function renderGrid() {
+  if (!marketState) return;
+  document.getElementById('stocks-grid').innerHTML = STOCK_DEFS.map(def => {
+    const s     = marketState.stocks[def.sym];
+    const chg   = pctChange(s?.history);
+    const isUp  = chg >= 0;
+    const color = isUp ? '#2ecc71' : '#e74c3c';
+    const owned = player.portfolio[def.sym];
+    const press = ((s?.buyPressure||0)+(s?.sellPressure||0)).toFixed(1);
+    return '<div class="stock-card" onclick="openModal(\''+def.sym+'\')">'
+      +'<div class="card-top"><div>'
+      +'<div class="stock-sym">'+def.sym+'</div>'
+      +'<div class="stock-name">'+def.name+'</div>'
+      +'</div><div class="stock-sector">'+def.sector+'</div></div>'
+      +'<div class="card-price-row">'
+      +'<div class="card-price">'+fmt(s?.price??def.base)+'</div>'
+      +'<div class="card-change '+(isUp?'up':'dn')+'">'+(isUp?'&#x25B2;':'&#x25BC;')+' '+Math.abs(chg).toFixed(2)+'%</div>'
+      +'</div>'
+      +'<div class="sparkline">'+sparklineSVG(s?.history,color)+'</div>'
+      +'<div class="card-footer">'
+      +(owned?'<span class="owned-badge">&#x2605; '+owned.shares+' owned</span>':'')
+      +'<span class="vol-info">Activity: '+press+'</span>'
+      +'</div></div>';
+  }).join('');
+}
+
+function updateTicker() {
+  if (!marketState) return;
+  const items = STOCK_DEFS.map(def => {
+    const s   = marketState.stocks[def.sym];
+    const chg = pctChange(s?.history);
+    const up  = chg >= 0;
+    return '<span class="ticker-item">'
+      +'<span class="ticker-sym">'+def.sym+'</span>'
+      +'<span class="ticker-price">'+fmt(s?.price??def.base)+'</span>'
+      +'<span class="ticker-change '+(up?'up':'dn')+'">'+(up?'+':'')+chg.toFixed(2)+'%</span>'
+      +'</span>';
+  }).join('');
+  document.getElementById('ticker-inner').innerHTML = items + items;
+}
+
+// ── STOCK MODAL ────────────────────────────────────────────
+window.openModal = function(sym) {
+  selectedSym = sym; tradeMode = 'buy';
+  renderModalContent(sym);
+  document.getElementById('modal-overlay').classList.add('open');
+};
+
+function renderModalContent(sym) {
+  if (!marketState) return;
+  const def   = STOCK_DEFS.find(d => d.sym===sym);
+  const s     = marketState.stocks[sym];
+  const chg   = pctChange(s?.history);
+  const isUp  = chg >= 0;
+  const owned = player.portfolio[sym];
+  const portPnl = owned ? (s.price - owned.avgCost) * owned.shares : 0;
+  const portPct = owned ? ((s.price - owned.avgCost) / owned.avgCost) * 100 : 0;
+  const isBuy   = tradeMode === 'buy';
+
+  document.getElementById('modal-content').innerHTML =
+    '<div class="modal-sym">'+sym+'</div>'
+    +'<div class="modal-company">'+def.name+'</div>'
+    +'<div class="modal-sector-tag">'+def.sector+'</div>'
+    +'<div class="modal-price-row">'
+    +'<div class="modal-price">'+fmt(s.price)+'</div>'
+    +'<div class="modal-change '+(isUp?'up':'dn')+'">'+(isUp?'&#x25B2;':'&#x25BC;')+' '+Math.abs(chg).toFixed(2)+'%</div>'
+    +'</div>'
+    +'<div class="full-chart">'+fullChartSVG(s.history)+'</div>'
+    +'<div class="stats-grid">'
+    +'<div class="stat-box"><div class="stat-label">Price</div><div class="stat-val">'+fmt(s.price)+'</div></div>'
+    +'<div class="stat-box"><div class="stat-label">Session High</div><div class="stat-val">'+fmt(Math.max(...(s.history||[s.price])))+'</div></div>'
+    +'<div class="stat-box"><div class="stat-label">Session Low</div><div class="stat-val">'+fmt(Math.min(...(s.history||[s.price])))+'</div></div>'
+    +'<div class="stat-box"><div class="stat-label">Buy Pressure</div><div class="stat-val up">'+((s.buyPressure||0).toFixed(2))+'</div></div>'
+    +'<div class="stat-box"><div class="stat-label">Sell Pressure</div><div class="stat-val dn">'+((s.sellPressure||0).toFixed(2))+'</div></div>'
+    +'<div class="stat-box"><div class="stat-label">Base Price</div><div class="stat-val">'+fmt(def.base)+'</div></div>'
+    +(owned
+      ? '<div class="stat-box"><div class="stat-label">Owned</div><div class="stat-val">'+owned.shares+' shares</div></div>'
+        +'<div class="stat-box"><div class="stat-label">Avg Cost</div><div class="stat-val">'+fmt(owned.avgCost)+'</div></div>'
+        +'<div class="stat-box"><div class="stat-label">P&amp;L</div><div class="stat-val '+(portPnl>=0?'up':'dn')+'">'+(portPnl>=0?'+':'')+fmt(portPnl)+'</div></div>'
+      : '')
+    +'</div>'
+    +'<div class="trade-section">'
+    +'<div class="trade-tabs">'
+    +'<div class="trade-tab '+(isBuy?'active-buy':'')+'" onclick="setMode(\'buy\')">BUY</div>'
+    +'<div class="trade-tab '+(!isBuy?'active-sell':'')+'" onclick="setMode(\'sell\')">SELL</div>'
+    +'</div>'
+    +'<div class="trade-input-row">'
+    +'<input class="trade-input" type="number" id="trade-qty" min="1" step="1" value="1" oninput="updateCost(\''+sym+'\')" placeholder="Shares">'
+    +'<span style="font-family:IBM Plex Mono;font-size:.8rem;color:var(--text2)">shares</span>'
+    +'</div>'
+    +'<div class="trade-cost" id="trade-cost-display">Total: <strong>'+fmt(s.price)+'</strong></div>'
+    +'<button class="trade-btn '+(isBuy?'buy-btn':'sell-btn')+'" id="trade-execute-btn" onclick="doTrade(\''+sym+'\')">'
+    +(isBuy?'&#x25B2; BUY':'&#x25BC; SELL')+' '+sym
+    +'</button>'
+    +'<div class="trade-msg" id="trade-msg"></div>'
+    +'</div>';
+}
+
+window.setMode = m => { tradeMode=m; if(selectedSym) renderModalContent(selectedSym); };
+
+window.updateCost = sym => {
+  const qty   = parseInt(document.getElementById('trade-qty')?.value)||0;
+  const price = marketState?.stocks[sym]?.price||0;
+  const el    = document.getElementById('trade-cost-display');
+  if(el) el.innerHTML='Total: <strong>'+fmt(price*qty)+'</strong>';
+};
+
+window.doTrade = async sym => {
+  const qty = parseInt(document.getElementById('trade-qty')?.value)||0;
+  const btn = document.getElementById('trade-execute-btn');
+  if(btn){btn.disabled=true;btn.textContent='Processing...';}
+  const result = tradeMode==='buy' ? await executeBuy(sym,qty) : await executeSell(sym,qty);
+  const msgEl  = document.getElementById('trade-msg');
+  if(msgEl){msgEl.textContent=result.msg;msgEl.className='trade-msg '+(result.ok?'ok':'err');}
+  showToast(result.msg, result.ok?'ok':'err');
+  if(result.ok) renderModalContent(sym);
+  else if(btn){btn.disabled=false;btn.textContent=(tradeMode==='buy'?'&#x25B2; BUY':'&#x25BC; SELL')+' '+sym;}
+};
+
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if(e.target===document.getElementById('modal-overlay')){
+    document.getElementById('modal-overlay').classList.remove('open');
+    selectedSym=null;
+  }
+});
+document.getElementById('modal-close-btn').addEventListener('click', ()=>{
+  document.getElementById('modal-overlay').classList.remove('open');
+  selectedSym=null;
+});
+
+// ── LEADERBOARD ────────────────────────────────────────────
+window.openLeaderboard = function() {
+  document.getElementById('lb-overlay').classList.add('open');
+  renderLeaderboard();
+};
+
+window.closeLeaderboard = function() {
+  document.getElementById('lb-overlay').classList.remove('open');
+};
+
+window.switchLbTab = function(tab) {
+  lbTab = tab;
+  document.getElementById('lb-tab-netw').className = 'lb-tab'+(tab==='netw'?' active':'');
+  document.getElementById('lb-tab-cash').className = 'lb-tab'+(tab==='cash'?' active':'');
+  renderLeaderboard();
+};
+
+window.renderLeaderboard = async function() {
+  const body = document.getElementById('lb-body');
+  if (offlineMode || !db) {
+    body.innerHTML = '<div class="lb-empty">&#x1F4F5; Leaderboard requires Firebase.<br>Connect Firebase to compete with classmates!</div>';
+    return;
+  }
+  body.innerHTML = '<div class="lb-loading">&#x231B; Loading scores...</div>';
+  try {
+    const snap = await get(ref(db, 'players'));
+    if (!snap.exists()) {
+      body.innerHTML = '<div class="lb-empty">No players yet. Be the first!</div>';
+      return;
+    }
+    const all = snap.val();
+    let entries = Object.entries(all).map(([id, p]) => ({
+      id, name: p.name||'Unknown', cash: p.cash||0, netWorth: p.netWorth||0, ts: p.ts||0
+    }));
+
+    // Sort by selected tab
+    if (lbTab === 'netw') {
+      entries.sort((a,b) => b.netWorth - a.netWorth);
+    } else {
+      entries.sort((a,b) => b.cash - a.cash);
+    }
+
+    const rankIcons = ['\uD83E\uDD47','\uD83E\uDD48','\uD83E\uDD49'];
+    const rankClass = ['gold','silver','bronze'];
+
+    let rows = entries.map((e, i) => {
+      const isMe = e.id === player.id;
+      const rank = i < 3
+        ? '<span class="lb-rank '+rankClass[i]+'">'+rankIcons[i]+'</span>'
+        : '<span class="lb-rank">#'+(i+1)+'</span>';
+      const nameCell = e.name
+        + (isMe ? ' <span class="you">YOU</span>' : '');
+      const cashCell  = '<span class="lb-cash">'+fmt(e.cash)+'</span>';
+      const netwCell  = '<span class="lb-netw">'+fmt(e.netWorth)+'</span>';
+      const pnl       = e.netWorth - START_BAL;
+      const pnlCell   = '<span class="'+(pnl>=0?'lb-cash':'') +'" style="'+(pnl<0?'color:var(--red)':'')+'">'+(pnl>=0?'+':'')+fmt(pnl)+'</span>';
+      return '<tr'+(isMe?' class="me"':'')+'>'
+        +'<td>'+rank+'</td>'
+        +'<td><span class="lb-name">'+nameCell+'</span></td>'
+        +'<td>'+netwCell+'</td>'
+        +'<td>'+cashCell+'</td>'
+        +'<td>'+pnlCell+'</td>'
+        +'</tr>';
+    }).join('');
+
+    const subText = lbTab==='netw'
+      ? 'Ranked by Net Worth (Cash + Portfolio Value)'
+      : 'Ranked by Cash on Hand';
+    document.getElementById('lb-sub').textContent = subText;
+
+    body.innerHTML =
+      '<table class="lb-table">'
+      +'<thead><tr>'
+      +'<th>#</th><th>Name</th><th>Net Worth</th><th>Cash</th><th>P&amp;L</th>'
+      +'</tr></thead>'
+      +'<tbody>'+rows+'</tbody>'
+      +'</table>';
+  } catch(e) {
+    body.innerHTML = '<div class="lb-empty">Error loading scores. Try refreshing.</div>';
+  }
+};
+
+document.getElementById('lb-overlay').addEventListener('click', e => {
+  if(e.target===document.getElementById('lb-overlay')) closeLeaderboard();
+});
+
+// ── ONBOARDING ─────────────────────────────────────────────
+if (!player.started) {
+  document.getElementById('onboarding').style.display='flex';
+}
+
+document.getElementById('start-btn').addEventListener('click', async () => {
+  const rawName = document.getElementById('name-input').value.trim();
+  const errEl   = document.getElementById('name-err');
+  const btn     = document.getElementById('start-btn');
+
+  if (!rawName) { errEl.textContent = 'Please enter your name.'; return; }
+  if (rawName.length < 2) { errEl.textContent = 'Name must be at least 2 characters.'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Checking name...';
+  errEl.textContent = '';
+
+  const taken = await isNameTaken(rawName);
+  if (taken) {
+    errEl.textContent = '\u26A0\uFE0F That name is already taken! Choose a different one.';
+    btn.disabled = false;
+    btn.textContent = 'Ring the Bell \uD83D\uDD14';
+    return;
+  }
+
+  player.name    = rawName;
+  player.started = true;
+  savePlayer();
+  await pushPlayerScore();
+  document.getElementById('onboarding').style.display='none';
+  showToast('Welcome, '+rawName+'! Good luck!', 'ok');
+  btn.disabled = false;
+  btn.textContent = 'Ring the Bell \uD83D\uDD14';
+});
+
+// ── RESET ──────────────────────────────────────────────────
+window.resetAccount = async () => {
+  if(!confirm('Reset your account? Your cash & portfolio reset to $5,000. Market prices stay.\n\nYour name will be freed up for others to use.')) return;
+  // Remove from Firebase players registry so name becomes free
+  if (db && !offlineMode && player.id) {
+    try { await set(ref(db, 'players/'+player.id), null); } catch(e) {}
+  }
+  localStorage.removeItem(PLAYER_KEY);
+  player = freshPlayer();
+  savePlayer();
+  document.getElementById('onboarding').style.display='flex';
+  renderAll();
+  showToast('Account reset. Good luck!','ok');
+};
+
+// ── SYNC STATUS ────────────────────────────────────────────
+function setSyncStatus(online) {
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  if(online){
+    el.textContent = '\u25CF Live \u2014 synced with class in real time';
+    el.style.color = 'var(--live)';
+  } else {
+    el.textContent = '\u25CF Offline mode \u2014 single player only';
+    el.style.color = 'var(--text3)';
+  }
+}
+
+// ── TOAST ──────────────────────────────────────────────────
+let _tt=null;
+function showToast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='show '+type;
+  if(_tt) clearTimeout(_tt);
+  _tt=setTimeout(()=>t.className='',2500);
+}
+
+// ── BOOT ───────────────────────────────────────────────────
+initFirebase();
+</script>
 </body>
 </html>
