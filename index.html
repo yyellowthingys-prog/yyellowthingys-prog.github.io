@@ -396,6 +396,8 @@ async function setupMarket() {
     // Push updated portfolio value to leaderboard registry
     if (player.started) pushPlayerScore();
   });
+  // Restore player progress from Firebase (cross-device save)
+  await syncPlayerFromFirebase();
   electLeader();
 }
 
@@ -467,21 +469,23 @@ async function tickMarket() {
       STOCK_DEFS.forEach(def => {
         const s = cur.stocks[def.sym];
         if (!s) return;
-        const p      = s.price;
-        const demand = ((s.buyPressure || 0) - (s.sellPressure || 0)) * 0.009;
-        const drift  = (Math.random() - 0.488) * 0.022;
-        const vol    = (50 / p) * 0.014 + 0.005;
-        const noise  = (Math.random() - 0.5) * vol * p;
-        const revert = (def.base - p) * 0.004;
-        let np = p + noise + revert + p * drift + p * demand;
+        const p = s.price;
+        // Small realistic background drift (real stocks always move a little)
+        const drift  = (Math.random() - 0.5) * 0.003 * p;
+        // Trade pressure has BIG visible impact so buys/sells really matter
+        const demand = ((s.buyPressure || 0) - (s.sellPressure || 0)) * 0.018 * p;
+        // Very gentle mean-reversion toward base price over time
+        const revert = (def.base - p) * 0.002;
+        let np = p + drift + demand + revert;
         np = Math.max(0.50, Math.round(np * 100) / 100);
         const hist = s.history || [p];
         hist.push(np);
         if (hist.length > 80) hist.shift();
         s.price        = np;
         s.history      = hist;
-        s.buyPressure  = (s.buyPressure  || 0) * 0.65;
-        s.sellPressure = (s.sellPressure || 0) * 0.65;
+        // Decay pressure so trade impact fades naturally over time
+        s.buyPressure  = (s.buyPressure  || 0) * 0.6;
+        s.sellPressure = (s.sellPressure || 0) * 0.6;
       });
       cur.tick = (cur.tick || 0) + 1;
       return cur;
@@ -503,18 +507,16 @@ function startOffline() {
     STOCK_DEFS.forEach(def => {
       const s  = marketState.stocks[def.sym];
       const p  = s.price;
-      const d  = ((s.buyPressure || 0) - (s.sellPressure || 0)) * 0.009;
-      const dr = (Math.random() - 0.488) * 0.022;
-      const v  = (50 / p) * 0.014 + 0.005;
-      const n  = (Math.random() - 0.5) * v * p;
-      const rv = (def.base - p) * 0.004;
-      let np   = p + n + rv + p * dr + p * d;
+      const drift  = (Math.random() - 0.5) * 0.003 * p;
+      const demand = ((s.buyPressure || 0) - (s.sellPressure || 0)) * 0.018 * p;
+      const revert = (def.base - p) * 0.002;
+      let np = p + drift + demand + revert;
       np = Math.max(0.50, Math.round(np * 100) / 100);
       s.history.push(np);
       if (s.history.length > 80) s.history.shift();
       s.price        = np;
-      s.buyPressure  = (s.buyPressure  || 0) * 0.65;
-      s.sellPressure = (s.sellPressure || 0) * 0.65;
+      s.buyPressure  = (s.buyPressure  || 0) * 0.6;
+      s.sellPressure = (s.sellPressure || 0) * 0.6;
     });
     marketState.tick++;
     renderAll(); updateTicker();
@@ -534,7 +536,7 @@ async function executeBuy(sym, shares) {
   if (db && !offlineMode) {
     await runTransaction(ref(db, 'market/stocks/'+sym), s => {
       if (!s) return s;
-      s.buyPressure = (s.buyPressure||0) + shares * 0.6;
+      s.buyPressure = (s.buyPressure||0) + shares * 1.2;
       return s;
     });
   } else {
@@ -564,7 +566,7 @@ async function executeSell(sym, shares) {
   if (db && !offlineMode) {
     await runTransaction(ref(db, 'market/stocks/'+sym), s => {
       if (!s) return s;
-      s.sellPressure = (s.sellPressure||0) + shares * 0.6;
+      s.sellPressure = (s.sellPressure||0) + shares * 1.2;
       return s;
     });
   } else {
@@ -580,6 +582,7 @@ async function executeSell(sym, shares) {
 }
 
 // ── PLAYER PERSISTENCE ─────────────────────────────────────
+// Loads from localStorage first (instant), then Firebase (cross-device sync)
 function loadPlayer() {
   try { const r = localStorage.getItem(PLAYER_KEY); if (r) return JSON.parse(r); } catch(e) {}
   return freshPlayer();
@@ -587,7 +590,48 @@ function loadPlayer() {
 function freshPlayer() {
   return { id:Math.random().toString(36).slice(2,10), name:'', cash:START_BAL, startBal:START_BAL, portfolio:{}, started:false };
 }
-function savePlayer() { localStorage.setItem(PLAYER_KEY, JSON.stringify(player)); }
+function savePlayer() {
+  // Always save locally for instant load next time
+  try { localStorage.setItem(PLAYER_KEY, JSON.stringify(player)); } catch(e) {}
+  // Also save to Firebase so progress survives across devices
+  if (db && !offlineMode && player.id && player.started) {
+    set(ref(db, 'players/' + player.id), {
+      name:      player.name,
+      cash:      Math.round(player.cash * 100) / 100,
+      netWorth:  Math.round((player.cash + portfolioValue()) * 100) / 100,
+      portfolio: player.portfolio,
+      startBal:  player.startBal,
+      ts:        Date.now()
+    }).catch(() => {});
+  }
+}
+
+// Load player data from Firebase (called after Firebase connects)
+// If Firebase has newer/different data for this player ID, restore it
+async function syncPlayerFromFirebase() {
+  if (!db || offlineMode || !player.id) return;
+  try {
+    const snap = await get(ref(db, 'players/' + player.id));
+    if (!snap.exists()) return;
+    const remote = snap.val();
+    // Only restore if remote has actual progress saved
+    if (!remote.started && !remote.name) return;
+    // Merge: trust Firebase as the source of truth for cash/portfolio
+    player.name      = remote.name      || player.name;
+    player.cash      = remote.cash      ?? player.cash;
+    player.portfolio = remote.portfolio || player.portfolio;
+    player.startBal  = remote.startBal  || player.startBal;
+    player.started   = remote.name ? true : player.started;
+    // Save merged state back to localStorage
+    try { localStorage.setItem(PLAYER_KEY, JSON.stringify(player)); } catch(e) {}
+    renderAll();
+    // Hide onboarding if we restored a valid session
+    if (player.started && player.name) {
+      document.getElementById('onboarding').style.display = 'none';
+      showToast('Welcome back, ' + player.name + '!', 'ok');
+    }
+  } catch(e) {}
+}
 
 // ── HELPERS ────────────────────────────────────────────────
 const fmt = n => '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
